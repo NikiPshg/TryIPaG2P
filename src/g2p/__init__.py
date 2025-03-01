@@ -1,1 +1,2 @@
-# hello g2p 
+def hello():
+    return "Hello from g2p"
