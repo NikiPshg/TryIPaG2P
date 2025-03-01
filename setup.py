@@ -12,7 +12,7 @@ try:
 except FileNotFoundError:
     requirements = []
 
-setup(
+setup( 
     name="TryRuIpa",
     version="0.1.0",
     description="TryRuIpa: A package for grapheme to phoneme.",
@@ -21,9 +21,9 @@ setup(
     author="NikiPshg",
     url="https://github.com/NikiPshg/TryIPaG2P",
     license="MIT",
-    packages=find_packages(where="src")
+    packages=find_packages(where="src"),
     package_dir={"": "src"},
     python_requires=">=3.8",
     install_requires=requirements,  
     include_package_data=True,
-)
+    )   
