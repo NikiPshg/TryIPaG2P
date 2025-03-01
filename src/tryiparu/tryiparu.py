@@ -7,9 +7,9 @@ import pandas as pd
 import torch
 from tokenizers import Tokenizer
 
-from .configs.config import config_g2p
-from .transformer import TransformerBlock
-from .rules import process_text
+from tryiparu.configs.config import config_g2p
+from tryiparu.transformer import TransformerBlock
+from tryiparu.rules import process_text
 
 ABSOLUTE_PATH = os.path.abspath(os.path.dirname(__file__))
 

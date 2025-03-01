@@ -1,11 +1,4 @@
-import sys
-
-src_path = r'C:\Users\RedmiBook\Apython\TryIPaG2P\src'
-
-if not (src_path in sys.path ):
-    sys.path.append(src_path)
-
-from g2p.g2p import G2PModel
+from tryiparu import G2PModel
 
 g2p = G2PModel()
 print(g2p(
