@@ -1,5 +1,5 @@
 .idea
 .vscode
-*csv
 venv
 **/__pycache__/
+.ipynb
