@@ -15,7 +15,7 @@ setup(
     author="NikiPshg",
     url="https://github.com/NikiPshg/TryIPaG2P/",
     license="MIT",
-    packages=find_packages(where="src/g2p"),
+    packages=find_packages(where="src"),
     package_dir={"": "src"},
     python_requires=">=3.8",
     install_requires=requirements, 
