@@ -1,6 +1,6 @@
 from tryiparu import G2PModel
 
-g2p = G2PModel(load_dataset=False)
+g2p = G2PModel(load_dataset=True)
 
 if __name__ == "__main__":
     print(g2p(

@@ -1,0 +1,3 @@
+include src/tryiparu/configs/bpe.json
+include src\tryiparu\data\cleaned_dataset.csv
+include src\tryiparu\weights\model.pt
