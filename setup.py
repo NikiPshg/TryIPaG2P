@@ -13,7 +13,7 @@ except FileNotFoundError:
     requirements = []
 
 setup( 
-    name="TryRuIpa",
+    name="TryIpaRu",
     version="0.1.0",
     description="TryRuIpa: A package for grapheme to phoneme.",
     long_description=long_description,
