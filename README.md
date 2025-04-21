@@ -1,18 +1,14 @@
-import sys
+from tryiparu import G2PModel
 
-src_path = ''
+g2p = G2PModel(load_dataset=False)
 
-if not (src_path in sys.path ):
-    sys.path.append(src_path)
-
-from g2p.g2p import G2PModel
-
-g2p = G2PModel()
-print(g2p(
-"""
-лесопромышленник, здраствуйте ,лестница . мтуси ? 
-"""
-)) 
+if __name__ == "__main__":
+    print(g2p(
+    """
+    Научная статья — законченное авторское произведение.
+    """
+    )) 
+    
 # ['lʲ', 'e', 's', 'ə', 'p', 'r', 'ɐ', 'm', 'ɨ', 'ʂ', 'lʲ', 'ɪ', 'nʲ(ː)', 'ɪ', 'k', ',',
 # 'z', 'd', 'r', 'a', 's', 't', 'v', 'ʊ', 'j', 'tʲ', 'e', ',',
 # 'lʲ', 'e', 'sʲ', 'nʲ', 'ɪ', 't͡s', 'ə', '.',

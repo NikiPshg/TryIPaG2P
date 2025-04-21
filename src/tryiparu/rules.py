@@ -85,27 +85,36 @@ def split_into_phonemes(word):
     return phonemes
 
 def merge_phoneme_tokens(tokens):
-    """
-    "(j)" + "ɪ" → "(j)ɪ")
-    """
     result = []
     i = 0
     while i < len(tokens):
-        if i == 0 and tokens[i].startswith("(") and tokens[i].endswith(")") and i + 1 < len(tokens):
-            merged = tokens[i] + tokens[i+1]
-            result.append(merged)
+        t = tokens[i]
+
+        if i == 0 and t.startswith("(") and t.endswith(")") and i+1 < len(tokens):
+            result.append(t + tokens[i+1])
             i += 2
-        elif tokens[i] in ["ˌ", "ˈ"] and i + 1 < len(tokens):
-            merged = tokens[i] + tokens[i+1]
-            result.append(merged)
+            continue
+
+        if t in ["ˌ", "ˈ"] and i+1 < len(tokens):
+            result.append(t + tokens[i+1])
             i += 2
-        elif tokens[i].startswith("(") and tokens[i].endswith(")") and result:
-            result[-1] = result[-1] + tokens[i]
+            continue
+
+        if t == "ː" and result:
+            result[-1] += "ː"
             i += 1
-        else:
-            result.append(tokens[i])
+            continue
+
+        if t.startswith("(") and t.endswith(")") and result:
+            result[-1] += t
             i += 1
+            continue
+
+        result.append(t)
+        i += 1
+
     return result
+
 
 def process_word(word):
     tokens = split_into_phonemes(word)
