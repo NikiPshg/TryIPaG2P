@@ -11,28 +11,40 @@ from tryiparu.configs.config import config_g2p
 from tryiparu.rules import process_text
 from tryiparu.transformer import TransformerBlock
 
-ABSOLUTE_PATH = os.path.abspath(os.path.dirname(__file__))
-
 
 class G2PModel:
     def __init__(
         self,
-        tokenizer_file: str = os.path.join(ABSOLUTE_PATH, "configs", "bpe.json"),
-        model_weights: str = os.path.join(ABSOLUTE_PATH, "weights", "model.pt"),
-        load_dataset: bool = True
+        tokenizer_file: str = None,
+        model_weights: str = None,
+        load_dataset: bool = True,
     ) -> None:
-        
-        self.tokenizer = Tokenizer.from_file(tokenizer_file)
+        ABSOLUTE_PATH = os.path.abspath(os.path.dirname(__file__))
+        self.tokenizer_file = (
+            os.path.join(ABSOLUTE_PATH, "configs", "bpe.json")
+            if tokenizer_file is None
+            else tokenizer_file
+        )
+        self.model_weights = (
+            os.path.join(ABSOLUTE_PATH, "weights", "model.pt")
+            if model_weights is None
+            else model_weights
+        )
 
-        self.model = TransformerBlock(
-            tokenizer=self.tokenizer,
-            config=config_g2p
-        )
+        self.tokenizer = Tokenizer.from_file(self.tokenizer_file)
+        self.model = TransformerBlock(tokenizer=self.tokenizer, config=config_g2p)
+
         self.model.load_state_dict(
-            torch.load(model_weights, map_location="cpu")
+            torch.load(
+                self.model_weights,
+                map_location="cpu",
+                weights_only=False,
+            )
         )
+
+        self.model = torch.compile(self.model, mode="max-autotune")
         self.model.eval()
-        self.max_length = config_g2p.get('MAX_LEN', 64)
+        self.max_length = config_g2p.get("MAX_LEN", 64)
 
         self.bos_token_id = self.tokenizer.encode("<bos>").ids[0]
         self.eos_token_id = self.tokenizer.encode("<eos>").ids[0]
@@ -40,9 +52,7 @@ class G2PModel:
 
         self.data_dict = {}
         if load_dataset:
-            data_path = os.path.join(
-                ABSOLUTE_PATH, "data", "cleaned_dataset.csv"
-            )
+            data_path = os.path.join(ABSOLUTE_PATH, "data", "cleaned_dataset.csv")
             df = pd.read_csv(data_path)
             self.data_dict = df.set_index("words")["phonemes"].to_dict()
 
@@ -55,13 +65,17 @@ class G2PModel:
             if not token.isalpha():
                 output_tokens.append(token)
             else:
-                phoneme_tokens = self.data_dict.get(
-                    token,
-                    self.greedy_decode(src=token, max_length=self.max_length)
-                )
+                if token in self.data_dict:
+                    phoneme_tokens = self.data_dict[token]
+                else:
+                    phoneme_tokens = self.greedy_decode(
+                        src=token, max_length=self.max_length
+                    )
+                    self.data_dict[token] = phoneme_tokens
+
                 phoneme_tokens = (
-                    [phoneme_tokens] 
-                    if not isinstance(phoneme_tokens, list) 
+                    [phoneme_tokens]
+                    if not isinstance(phoneme_tokens, list)
                     else phoneme_tokens
                 )
                 output_tokens.extend(phoneme_tokens)
@@ -74,8 +88,7 @@ class G2PModel:
             if token == " ":
                 if (
                     (i > 0 and output_tokens[i - 1] in string.punctuation)
-                    or (i < len(output_tokens) - 1 
-                        and output_tokens[i + 1] in string.punctuation)
+                    or (i < len(output_tokens) - 1 and output_tokens[i + 1] in string.punctuation)
                     or (i > 0 and output_tokens[i - 1] == " ")
                 ):
                     continue
@@ -88,8 +101,9 @@ class G2PModel:
 
     @torch.inference_mode()
     def greedy_decode(self, src: str, max_length: int) -> List[str]:
+        device = next(self.model.parameters()).device
         src_tokens = self.tokenizer.encode(src).ids
-        encoder_sequence_length = len(src_tokens) + 2
+        encoder_sequence_length = len(src_tokens) + 2  # bos + src + eos
         padding_length = self.max_length - encoder_sequence_length
 
         if padding_length < 0:
@@ -98,12 +112,15 @@ class G2PModel:
                 f"got {encoder_sequence_length}"
             )
 
-        encoder_input = torch.cat([
-            torch.tensor([self.bos_token_id]),
-            torch.tensor(src_tokens),
-            torch.tensor([self.eos_token_id]),
-            torch.tensor([self.pad_token_id] * padding_length),
-        ], dim=0)
+        encoder_input = torch.cat(
+            [
+                torch.tensor([self.bos_token_id]),
+                torch.tensor(src_tokens),
+                torch.tensor([self.eos_token_id]),
+                torch.tensor([self.pad_token_id] * padding_length),
+            ],
+            dim=0,
+        ).to(device)
 
         encoder_input = encoder_input.unsqueeze(0)
         encoder_mask = (
@@ -111,19 +128,20 @@ class G2PModel:
             .unsqueeze(1)
             .unsqueeze(1)
             .int()
+            .to(device)
         )
 
         encoder_output = self.model.encode(encoder_input, encoder_mask)
-        decoder_input = torch.tensor(
-            [[self.bos_token_id]], 
-            dtype=encoder_input.dtype
+        decoder_input = torch.tensor([[self.bos_token_id]], dtype=encoder_input.dtype).to(
+            device
         )
 
         for _ in range(max_length - 1):
             tgt_mask = torch.tril(
                 torch.ones(
                     (decoder_input.size(1), decoder_input.size(1)),
-                    dtype=encoder_input.dtype
+                    dtype=encoder_input.dtype,
+                    device=device,
                 )
             ).unsqueeze(0)
             decoder_output = self.model.decode(
@@ -132,10 +150,13 @@ class G2PModel:
             logits = self.model.fc_out(decoder_output[:, -1])
             next_token = torch.argmax(logits, dim=1).item()
 
-            decoder_input = torch.cat([
-                decoder_input,
-                torch.tensor([[next_token]], dtype=encoder_input.dtype)
-            ], dim=1)
+            decoder_input = torch.cat(
+                [
+                    decoder_input,
+                    torch.tensor([[next_token]], dtype=encoder_input.dtype).to(device),
+                ],
+                dim=1,
+            )
 
             if next_token == self.eos_token_id:
                 break
@@ -150,7 +171,3 @@ class G2PModel:
     @staticmethod
     def _process_decoded_output(decoded: str) -> List[str]:
         return [token for token in decoded.split("Ġ") if token]
-
-
-if __name__ == "__main__":
-    pass
