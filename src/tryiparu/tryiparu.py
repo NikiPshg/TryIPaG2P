@@ -32,10 +32,12 @@ class G2PModel:
             else model_weights
         )
 
-        self.tokenizer = Tokenizer.from_file(self.tokenizer_file)
-        self.model = TransformerBlock(tokenizer=self.tokenizer, config=config_g2p)
         self.device = device
 
+        self.tokenizer = Tokenizer.from_file(self.tokenizer_file)
+        self.model = TransformerBlock(tokenizer=self.tokenizer, config=config_g2p)
+
+        self.model.to(self.device)
         self.model.load_state_dict(
             torch.load(
                 self.model_weights,
