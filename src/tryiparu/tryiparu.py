@@ -15,6 +15,7 @@ from tryiparu.transformer import TransformerBlock
 class G2PModel:
     def __init__(
         self,
+        device: str,
         tokenizer_file: str = None,
         model_weights: str = None,
         load_dataset: bool = True,
@@ -31,13 +32,16 @@ class G2PModel:
             else model_weights
         )
 
+        self.device = device
+
         self.tokenizer = Tokenizer.from_file(self.tokenizer_file)
         self.model = TransformerBlock(tokenizer=self.tokenizer, config=config_g2p)
 
+        self.model.to(self.device)
         self.model.load_state_dict(
             torch.load(
                 self.model_weights,
-                map_location="cpu",
+                map_location=self.device,
                 weights_only=False,
             )
         )
@@ -101,9 +105,8 @@ class G2PModel:
 
     @torch.inference_mode()
     def greedy_decode(self, src: str, max_length: int) -> List[str]:
-        device = next(self.model.parameters()).device
         src_tokens = self.tokenizer.encode(src).ids
-        encoder_sequence_length = len(src_tokens) + 2  # bos + src + eos
+        encoder_sequence_length = len(src_tokens) + 2  
         padding_length = self.max_length - encoder_sequence_length
 
         if padding_length < 0:
@@ -120,7 +123,7 @@ class G2PModel:
                 torch.tensor([self.pad_token_id] * padding_length),
             ],
             dim=0,
-        ).to(device)
+        ).to(self.device)
 
         encoder_input = encoder_input.unsqueeze(0)
         encoder_mask = (
@@ -128,12 +131,12 @@ class G2PModel:
             .unsqueeze(1)
             .unsqueeze(1)
             .int()
-            .to(device)
+            .to(self.device)
         )
 
         encoder_output = self.model.encode(encoder_input, encoder_mask)
         decoder_input = torch.tensor([[self.bos_token_id]], dtype=encoder_input.dtype).to(
-            device
+            self.device
         )
 
         for _ in range(max_length - 1):
@@ -141,7 +144,7 @@ class G2PModel:
                 torch.ones(
                     (decoder_input.size(1), decoder_input.size(1)),
                     dtype=encoder_input.dtype,
-                    device=device,
+                    device=self.device,
                 )
             ).unsqueeze(0)
             decoder_output = self.model.decode(
@@ -153,7 +156,7 @@ class G2PModel:
             decoder_input = torch.cat(
                 [
                     decoder_input,
-                    torch.tensor([[next_token]], dtype=encoder_input.dtype).to(device),
+                    torch.tensor([[next_token]], dtype=encoder_input.dtype).to(self.device),
                 ],
                 dim=1,
             )
