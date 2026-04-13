@@ -1,68 +1,70 @@
-import unicodedata
 import string
+import unicodedata
 
-def is_diacritic(char):
+_DIACRITIC_CHARS = frozenset("ʲː")
+_PUNCTUATION = set(string.punctuation)
 
-    if unicodedata.combining(char) != 0:
-        return True
-    if char in "ʲː":
-        return True
-    return False
 
-def split_into_phonemes(phonemes: str):
-    phonemes_list = []
+def is_diacritic(char: str) -> bool:
+    return unicodedata.combining(char) != 0 or char in _DIACRITIC_CHARS
+
+
+def split_into_phonemes(phonemes: str) -> list[str]:
+    result: list[str] = []
     i = 0
     n = len(phonemes)
+
     while i < n:
-        if phonemes[i].isspace():
+        ch = phonemes[i]
+
+        if ch.isspace():
             i += 1
             continue
 
-        # ( ː )
-        if phonemes[i] == '(':
-            group = '('
-            i += 1  
-            while i < n and phonemes[i] != ')':
+        if ch == "(":
+            group = "("
+            i += 1
+            while i < n and phonemes[i] != ")":
                 if not phonemes[i].isspace():
                     group += phonemes[i]
                 i += 1
-            if i < n and phonemes[i] == ')':
-                group += ')'
+            if i < n and phonemes[i] == ")":
+                group += ")"
                 i += 1
-            phonemes_list.append(group)
+            result.append(group)
             continue
 
-        # (⁽ ... ⁾)
-        if phonemes[i] == "⁽":
+        if ch == "⁽":
             diacritic = ""
-            i += 1  # пропускаем ⁽
+            i += 1
             while i < n and phonemes[i] != "⁾":
                 if not phonemes[i].isspace():
                     diacritic += phonemes[i]
                 i += 1
             if i < n and phonemes[i] == "⁾":
                 i += 1
-            if phonemes_list:
-                phonemes_list[-1] += "⁽" + diacritic + "⁾"
+            suffix = "⁽" + diacritic + "⁾"
+            if result:
+                result[-1] += suffix
             else:
-                phonemes_list.append("⁽" + diacritic + "⁾")
+                result.append(suffix)
             continue
 
-        if phonemes[i] == "͡":
-            if phonemes_list:
-                phonemes_list[-1] += phonemes[i]
+        if ch == "͡":
+            if result:
+                result[-1] += ch
             else:
-                phonemes_list.append(phonemes[i])
+                result.append(ch)
             i += 1
             if i < n:
-                phonemes_list[-1] += phonemes[i]
+                result[-1] += phonemes[i]
                 i += 1
                 while i < n and is_diacritic(phonemes[i]) and phonemes[i] != "͡":
-                    phonemes_list[-1] += phonemes[i]
+                    result[-1] += phonemes[i]
                     i += 1
             continue
 
-        token = phonemes[i]
+        token = ch
         i += 1
         while i < n:
             if phonemes[i] == "͡":
@@ -81,22 +83,26 @@ def split_into_phonemes(phonemes: str):
                 i += 1
             else:
                 break
-        phonemes_list.append(token)
-    return phonemes_list
+        result.append(token)
 
-def merge_phoneme_tokens(tokens):
-    result = []
+    return result
+
+
+def merge_phoneme_tokens(tokens: list[str]) -> list[str]:
+    result: list[str] = []
     i = 0
-    while i < len(tokens):
+    n = len(tokens)
+
+    while i < n:
         t = tokens[i]
 
-        if i == 0 and t.startswith("(") and t.endswith(")") and i+1 < len(tokens):
-            result.append(t + tokens[i+1])
+        if i == 0 and t.startswith("(") and t.endswith(")") and i + 1 < n:
+            result.append(t + tokens[i + 1])
             i += 2
             continue
 
-        if t in ["ˌ", "ˈ"] and i+1 < len(tokens):
-            result.append(t + tokens[i+1])
+        if t in ("ˌ", "ˈ") and i + 1 < n:
+            result.append(t + tokens[i + 1])
             i += 2
             continue
 
@@ -116,18 +122,15 @@ def merge_phoneme_tokens(tokens):
     return result
 
 
-def process_word(phonemes: str):
-    tokens = split_into_phonemes(phonemes)
-    merged_phonemes = merge_phoneme_tokens(tokens)
-    return merged_phonemes
+def process_word(phonemes: str) -> list[str]:
+    return merge_phoneme_tokens(split_into_phonemes(phonemes))
 
-def process_text(phonemes: str):
-    result = []
+
+def process_text(phonemes: list[str]) -> list[str]:
+    result: list[str] = []
     for phoneme in phonemes:
-        if phoneme.strip() == "" or all(ch in string.punctuation for ch in phoneme):  
+        if phoneme.strip() == "" or all(ch in _PUNCTUATION for ch in phoneme):
             result.append(phoneme)
         else:
             result.extend(process_word(phoneme))
     return result
-
-

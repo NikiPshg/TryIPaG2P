@@ -1,4 +1,4 @@
 from tryiparu.tryiparu import G2PModel
 
-def hello():
-    return "Hello from g2p"
+__version__ = "0.2.0"
+__all__ = ["G2PModel"]
